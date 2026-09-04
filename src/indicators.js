@@ -34,6 +34,44 @@
 /* Wilder's smoothing, which is what RSI, MFI, ATR and DMI actually use. An EMA
    with alpha 2/(n+1) here reads close enough to look right and is wrong by a few
    percent everywhere — the classic way an indicator ends up nearly matching. */
+/* WHAT A "BAR" IS, AND WHAT HAPPENS WHEN IT IS NOT ONE.
+ *
+ * Most functions here take `{ o, h, l, c, v }`. Handed an array of plain numbers — which
+ * is what a caller usually has, and what every close-taking function in this file
+ * accepts — they used to read `.c` off a number, get `undefined`, and carry it forward.
+ * The result was the right length with the warmup nulls in the right places and every
+ * value after them wrong: NaN from `rsi`, and 0 from `bollinger`'s middle band, which is
+ * a number a caller may well plot before noticing.
+ *
+ * So the two cases are separated and both are explicit.
+ *
+ * Where only the close is read, a series of numbers is exactly as good as bars and is
+ * accepted as one. Where the high, low or volume genuinely matters, numbers cannot
+ * answer the question and the call is refused rather than approximated — an ATR computed
+ * from bars whose high, low and close are all the same number is not a worse ATR, it is
+ * zero.
+ *
+ * Added after eqdoc/indicato#2, where the silent version cost a real afternoon. */
+
+const isNumberSeries = (x) => Array.isArray(x) && x.length > 0 && typeof x[0] === "number";
+
+/* Only the close is read, so numbers are bars with nothing else filled in. */
+function closeBars(bars) {
+  return isNumberSeries(bars) ? bars.map((c) => ({ o: c, h: c, l: c, c })) : bars;
+}
+
+/* The high, low or volume is read. Numbers cannot stand in for them. */
+function requireBars(bars, name) {
+  if (isNumberSeries(bars)) {
+    throw new TypeError(
+      `${name} needs bars — objects of { o, h, l, c, v } — and was given a series of ` +
+      `numbers. Only the close-based indicators take a plain series; this one reads the ` +
+      `high, low or volume, which a close alone cannot supply.`
+    );
+  }
+  return bars;
+}
+
 function rma(values, n) {
   const out = new Array(values.length).fill(null);
   let sum = 0;
@@ -96,6 +134,7 @@ export function wma(values, n) {
    standard deviation, Keltner's with true range — which is why traders watch the
    pair together, and why shipping one without the other was a gap. */
 export function keltner(bars, n = 20, mult = 2) {
+  bars = requireBars(bars, "keltner");
   const mid = ema(bars.map((b) => b.c), n);
   const a = atr(bars, n);
   return {
@@ -110,6 +149,7 @@ export function keltner(bars, n = 20, mult = 2) {
    same formula over RSI instead of over price; the file had the derivative and
    not the original. */
 export function stochastic(bars, n = 14, k = 3, d = 3) {
+  bars = requireBars(bars, "stochastic");
   /* Hoisted, and the reason matters: the first version called bars.map() for the
      highs and again for the lows INSIDE the per-bar callback, rebuilding two
      2,600-element arrays on every one of 2,600 iterations. Measured at 60ms for
@@ -150,7 +190,7 @@ function trueRange(bars) {
    of a typical session, in rupees. TRUE range, not high minus low — a share that
    gapped 100 to 130 overnight then traded 130-132 had a 2-rupee day by high minus
    low and a 32-rupee day in truth. */
-export const atr = (bars, n = 14) => rma(trueRange(bars), n);
+export const atr = (bars, n = 14) => rma(trueRange(requireBars(bars, "atr")), n);
 
 
 /* ── the moving-average family ────────────────────────────────────────────────
@@ -194,6 +234,7 @@ export function hma(src, n) {
 
 /* Volume-weighted: each bar counts for what traded on it. */
 export function vwma(bars, n) {
+  bars = requireBars(bars, "vwma");
   return bars.map((_, i) => {
     if (i < n - 1) return null;
     let pv = 0, v = 0;
@@ -310,6 +351,7 @@ export function vidya(src, n = 14, smooth = 20) {
    window and lets that set the EMA's alpha. A straight run gives D near 1 and a
    fast average; a jagged one gives D near 2 and a slow one. */
 export function frama(bars, n = 16) {
+  bars = requireBars(bars, "frama");
   const N = n % 2 === 0 ? n : n + 1, h = N / 2;
   const out = new Array(bars.length).fill(null);
   for (let i = 0; i < bars.length; i++) {
@@ -339,6 +381,7 @@ export function frama(bars, n = 16) {
 /* Commodity Channel Index — Donald Lambert. The 0.015 scales it so roughly 70-80%
    of readings fall within ±100; it is his, not a tuning knob. */
 export function cci(bars, n = 20) {
+  bars = requireBars(bars, "cci");
   const tp = bars.map((b) => (b.h + b.l + b.c) / 3);
   const ma = sma(tp, n);
   return bars.map((_, i) => {
@@ -352,6 +395,7 @@ export function cci(bars, n = 20) {
 
 /* Williams %R — where the close sits in the range, as a negative percentage. */
 export function williamsR(bars, n = 14) {
+  bars = requireBars(bars, "williamsR");
   const hs = bars.map((b) => b.h), ls = bars.map((b) => b.l);
   return bars.map((b, i) => {
     if (i < n - 1) return null;
@@ -411,11 +455,13 @@ export function dpo(src, n = 20) {
 
 /* Awesome and Accelerator — Bill Williams, on the bar's midpoint. */
 export function ao(bars) {
+  bars = requireBars(bars, "ao");
   const mid = bars.map((b) => (b.h + b.l) / 2);
   const f = sma(mid, 5), s = sma(mid, 34);
   return bars.map((_, i) => (f[i] == null || s[i] == null ? null : f[i] - s[i]));
 }
 export function ac(bars) {
+  bars = requireBars(bars, "ac");
   const a = ao(bars);
   const m = sma(a.map((v) => (v == null ? 0 : v)), 5);
   return a.map((v, i) => (i < 38 || v == null || m[i] == null ? null : v - m[i]));
@@ -447,6 +493,7 @@ export function coppock(src, a = 14, b = 11, n = 10) {
 /* Ultimate Oscillator — Williams. Three horizons weighted 4:2:1, so a single
    timeframe cannot dominate it. */
 export function ultosc(bars, s = 7, m = 14, l = 28) {
+  bars = requireBars(bars, "ultosc");
   const bp = [], tr = [];
   for (let i = 0; i < bars.length; i++) {
     if (i === 0) { bp.push(0); tr.push(bars[0].h - bars[0].l); continue; }
@@ -466,11 +513,13 @@ export function ultosc(bars, s = 7, m = 14, l = 28) {
 
 /* Balance of Power — where the close finished relative to the open, scaled by range. */
 export function bop(bars) {
+  bars = requireBars(bars, "bop");
   return bars.map((b) => (b.h === b.l ? 0 : (b.c - b.o) / (b.h - b.l)));
 }
 
 /* Elder Ray — how far buyers and sellers pushed past the trend. */
 export function elderRay(bars, n = 13) {
+  bars = requireBars(bars, "elderRay");
   const e = ema(bars.map((b) => b.c), n);
   return {
     bull: bars.map((b, i) => (e[i] == null ? null : b.h - e[i])),
@@ -481,6 +530,7 @@ export function elderRay(bars, n = 13) {
 /* Fisher Transform — Ehlers. Forces a bounded series toward a gaussian shape so
    turns become sharp rather than gradual. */
 export function fisher(bars, n = 9) {
+  bars = requireBars(bars, "fisher");
   const hs = bars.map((b) => b.h), ls = bars.map((b) => b.l);
   const out = new Array(bars.length).fill(null), sig = new Array(bars.length).fill(null);
   let v = 0, f = 0;
@@ -507,12 +557,14 @@ export function fisher(bars, n = 9) {
 
 /* Normalised ATR — volatility as a percentage of price, so it compares across stocks. */
 export function natr(bars, n = 14) {
+  bars = requireBars(bars, "natr");
   const a = rma(trueRange(bars), n);
   return bars.map((b, i) => (a[i] == null || b.c === 0 ? null : (a[i] / b.c) * 100));
 }
 
 /* Bollinger %B and bandwidth — where price sits in the band, and how wide it is. */
 export function bbPercent(bars, n = 20, mult = 2) {
+  bars = closeBars(bars);
   const b = bollinger(bars, n, mult);
   return bars.map((x, i) => {
     if (b.upper[i] == null || b.upper[i] === b.lower[i]) return null;
@@ -520,12 +572,14 @@ export function bbPercent(bars, n = 20, mult = 2) {
   });
 }
 export function bbWidth(bars, n = 20, mult = 2) {
+  bars = closeBars(bars);
   const b = bollinger(bars, n, mult);
   return bars.map((_, i) => (b.mid[i] == null || b.mid[i] === 0 ? null : ((b.upper[i] - b.lower[i]) / b.mid[i]) * 100));
 }
 
 /* STARC bands — Stoller. A simple average with Wilder ATR either side. */
 export function starc(bars, n = 15, atrLen = 15, mult = 2) {
+  bars = requireBars(bars, "starc");
   const ma = sma(bars.map((b) => b.c), n), a = rma(trueRange(bars), atrLen);
   return {
     mid: ma,
@@ -536,6 +590,7 @@ export function starc(bars, n = 15, atrLen = 15, mult = 2) {
 
 /* Chandelier Exit — Le Beau. A stop hung from the highest high since entry. */
 export function chandelierExit(bars, n = 22, mult = 3) {
+  bars = requireBars(bars, "chandelierExit");
   const hs = bars.map((b) => b.h), ls = bars.map((b) => b.l), a = rma(trueRange(bars), n);
   return {
     long: bars.map((_, i) => (i < n - 1 || a[i] == null ? null : highest(hs, i, n) - mult * a[i])),
@@ -545,6 +600,7 @@ export function chandelierExit(bars, n = 22, mult = 3) {
 
 /* Chande Kroll stop — the same idea with a two-stage lookback. */
 export function chandeKrollStop(bars, p = 10, x = 1, q = 9) {
+  bars = requireBars(bars, "chandeKrollStop");
   const a = rma(trueRange(bars), p);
   const hs = bars.map((b) => b.h), ls = bars.map((b) => b.l);
   const hiStop = bars.map((_, i) => (i < p - 1 || a[i] == null ? null : highest(hs, i, p) - x * a[i]));
@@ -563,6 +619,7 @@ export function chandeKrollStop(bars, p = 10, x = 1, q = 9) {
    for monthly, or roughly 1,575 for hourly bars on a 6.25-hour Indian session. Getting
    this wrong does not error — it scales the answer by the square root of the ratio. */
 export function historicalVolatility(bars, n = 20, barsPerYear = 252) {
+  bars = closeBars(bars);
   const lr = bars.map((b, i) => (i === 0 || bars[i - 1].c <= 0 ? 0 : Math.log(b.c / bars[i - 1].c)));
   return bars.map((_, i) => {
     if (i < n) return null;
@@ -576,6 +633,7 @@ export function historicalVolatility(bars, n = 20, barsPerYear = 252) {
 /* Ulcer Index — Martin. Depth and duration of drawdown, which is closer to what
    holding something actually feels like than standard deviation is. */
 export function ulcerIndex(bars, n = 14) {
+  bars = closeBars(bars);
   const cs = bars.map((b) => b.c);
   return bars.map((_, i) => {
     if (i < n - 1) return null;
@@ -591,6 +649,7 @@ export function ulcerIndex(bars, n = 14) {
 
 /* Mass Index — Dorsey. Range expansion as a reversal warning. */
 export function massIndex(bars, n = 25, e = 9) {
+  bars = requireBars(bars, "massIndex");
   const range = bars.map((b) => b.h - b.l);
   const e1 = ema(range, e);
   const e2 = ema(e1.map((v) => (v == null ? 0 : v)), e);
@@ -604,6 +663,7 @@ export function massIndex(bars, n = 25, e = 9) {
 
 /* Choppiness — Dreiss. 100 means directionless, 0 means a clean trend. */
 export function chop(bars, n = 14) {
+  bars = requireBars(bars, "chop");
   const a = trueRange(bars);
   const hs = bars.map((b) => b.h), ls = bars.map((b) => b.l);
   return bars.map((_, i) => {
@@ -619,6 +679,7 @@ export function chop(bars, n = 14) {
 /* VWAP — running, from the first bar. Intraday VWAP resets daily; on daily bars
    there is no session to reset on, so this is the cumulative one and is labelled so. */
 export function vwap(bars) {
+  bars = requireBars(bars, "vwap");
   let pv = 0, vv = 0;
   return bars.map((b) => {
     const v = vol(b);
@@ -630,6 +691,7 @@ export function vwap(bars) {
 
 /* Accumulation/Distribution — Chaikin's money flow multiplier, accumulated. */
 export function adl(bars) {
+  bars = requireBars(bars, "adl");
   let run = 0;
   return bars.map((b) => {
     const v = vol(b);
@@ -642,6 +704,7 @@ export function adl(bars) {
 
 /* Chaikin Money Flow, and the Chaikin Oscillator over the A/D line. */
 export function cmf(bars, n = 20) {
+  bars = requireBars(bars, "cmf");
   return bars.map((_, i) => {
     if (i < n - 1) return null;
     let mfv = 0, vv = 0;
@@ -655,6 +718,7 @@ export function cmf(bars, n = 20) {
   });
 }
 export function chaikinOsc(bars, fast = 3, slow = 10) {
+  bars = requireBars(bars, "chaikinOsc");
   const a = adl(bars).map((v) => (v == null ? 0 : v));
   const f = ema(a, fast), s = ema(a, slow);
   return bars.map((_, i) => (f[i] == null || s[i] == null ? null : f[i] - s[i]));
@@ -662,6 +726,7 @@ export function chaikinOsc(bars, fast = 3, slow = 10) {
 
 /* Ease of Movement — Arms. How far price moved per unit of volume. */
 export function emv(bars, n = 14) {
+  bars = requireBars(bars, "emv");
   const raw = bars.map((b, i) => {
     if (i === 0) return 0;
     const v = vol(b);
@@ -674,6 +739,7 @@ export function emv(bars, n = 14) {
 
 /* Force Index — Elder. Price change times volume. */
 export function forceIndex(bars, n = 13) {
+  bars = requireBars(bars, "forceIndex");
   const raw = bars.map((b, i) => (i === 0 ? 0 : (b.c - bars[i - 1].c) * (vol(b) ?? 0)));
   return ema(raw, n);
 }
@@ -691,22 +757,25 @@ function volIndex(bars, wantRise) {
     return idx;
   });
 }
-export const nvi = (bars) => volIndex(bars, false);
-export const pvi = (bars) => volIndex(bars, true);
+export const nvi = (bars) => volIndex(requireBars(bars, "nvi"), false);
+export const pvi = (bars) => volIndex(requireBars(bars, "pvi"), true);
 
 /* Volume oscillator and volume rate of change. */
 export function volumeOsc(bars, fast = 5, slow = 10) {
+  bars = requireBars(bars, "volumeOsc");
   const v = bars.map((b) => vol(b) ?? 0);
   const f = sma(v, fast), s = sma(v, slow);
   return bars.map((_, i) => (f[i] == null || s[i] == null || s[i] === 0 ? null : ((f[i] - s[i]) / s[i]) * 100));
 }
 export function vroc(bars, n = 14) {
+  bars = requireBars(bars, "vroc");
   const v = bars.map((b) => vol(b) ?? 0);
   return v.map((x, i) => (i < n || v[i - n] === 0 ? null : ((x - v[i - n]) / v[i - n]) * 100));
 }
 
 /* Klinger — Kroll's volume force, and Price Volume Trend. */
 export function klinger(bars, fast = 34, slow = 55, sig = 13) {
+  bars = requireBars(bars, "klinger");
   let trend = 1, cm = 0, prevHLC = null;
   const vf = bars.map((b, i) => {
     const v = vol(b) ?? 0;
@@ -722,6 +791,7 @@ export function klinger(bars, fast = 34, slow = 55, sig = 13) {
   return { kvo, signal: ema(kvo.map((v) => (v == null ? 0 : v)), sig) };
 }
 export function pvt(bars) {
+  bars = requireBars(bars, "pvt");
   let run = 0;
   return bars.map((b, i) => {
     if (i === 0) return 0;
@@ -740,6 +810,7 @@ export function pvt(bars) {
 /* Aroon — Chande. How long since the window's high and low, as a percentage.
    Both at 100 means the extreme is today. */
 export function aroon(bars, n = 25) {
+  bars = requireBars(bars, "aroon");
   const up = [], down = [];
   for (let i = 0; i < bars.length; i++) {
     if (i < n) { up.push(null); down.push(null); continue; }
@@ -756,6 +827,7 @@ export function aroon(bars, n = 25) {
 
 /* Vortex — Botes and Siepman. Two lines crossing marks a trend change. */
 export function vortex(bars, n = 14) {
+  bars = requireBars(bars, "vortex");
   const tr = trueRange(bars);
   const vmP = bars.map((b, i) => (i ? Math.abs(b.h - bars[i - 1].l) : 0));
   const vmN = bars.map((b, i) => (i ? Math.abs(b.l - bars[i - 1].h) : 0));
@@ -773,6 +845,7 @@ export function vortex(bars, n = 14) {
 /* Random Walk Index — Poulos. How far price travelled against how far a random
    walk of the same volatility would be expected to. */
 export function rwi(bars, n = 14) {
+  bars = requireBars(bars, "rwi");
   const a = rma(trueRange(bars), n);
   const hi = [], lo = [];
   for (let i = 0; i < bars.length; i++) {
@@ -809,6 +882,7 @@ export function stc(src, fast = 23, slow = 50, cycle = 10) {
 /* Williams Fractals — a high with two lower highs either side. Confirmed only two
    bars later, which is the whole point: it cannot be known sooner. */
 export function williamsFractals(bars, w = 2) {
+  bars = requireBars(bars, "williamsFractals");
   const up = new Array(bars.length).fill(null), down = new Array(bars.length).fill(null);
   for (let i = w; i < bars.length - w; i++) {
     let isHigh = true, isLow = true;
@@ -826,6 +900,7 @@ export function williamsFractals(bars, w = 2) {
 
 /* Classic floor-trader pivots from the previous bar. */
 export function pivotPoints(bars) {
+  bars = requireBars(bars, "pivotPoints");
   const p = [], r1 = [], r2 = [], s1 = [], s2 = [];
   for (let i = 0; i < bars.length; i++) {
     if (i === 0) { p.push(null); r1.push(null); r2.push(null); s1.push(null); s2.push(null); continue; }
@@ -841,6 +916,7 @@ export function pivotPoints(bars) {
    FORWARD, which on a chart is a line drawn ahead of price — so for a signal each is
    read from its own past, never from a bar that has not happened. */
 export function alligator(bars) {
+  bars = requireBars(bars, "alligator");
   const med = bars.map((b) => (b.h + b.l) / 2);
   const shift = (arr, by) => arr.map((_, i) => (i - by < 0 ? null : arr[i - by]));
   const smma = (src, n) => rma(src, n);
@@ -851,6 +927,7 @@ export function alligator(bars) {
   };
 }
 export function gator(bars) {
+  bars = requireBars(bars, "gator");
   const a = alligator(bars);
   return {
     upper: a.jaw.map((v, i) => (v == null || a.teeth[i] == null ? null : Math.abs(v - a.teeth[i]))),
@@ -860,6 +937,7 @@ export function gator(bars) {
 
 /* Moving-average envelopes — a fixed percentage either side. */
 export function envelopes(bars, n = 20, pct = 2.5) {
+  bars = closeBars(bars);
   const ma = sma(bars.map((b) => b.c), n);
   return {
     mid: ma,
@@ -948,6 +1026,7 @@ export function beta(a, b, n = 20) {
    of the streak of consecutive up or down closes, and where today's return ranks
    against the last hundred. Built for mean reversion over two or three days. */
 export function crsi(bars, rsiLen = 3, streakLen = 2, rankLen = 100) {
+  bars = closeBars(bars);
   const close = bars.map((b) => b.c);
   const r1 = rsi(bars, rsiLen);
   const streak = close.map((_, i) => 0);
@@ -971,6 +1050,7 @@ export function crsi(bars, rsiLen = 3, streakLen = 2, rankLen = 100) {
 /* Relative Vigor Index — Dorsey. Where the close finished within the bar, smoothed,
    on the theory that a rising market closes above its open. */
 export function rvi(bars, n = 10) {
+  bars = requireBars(bars, "rvi");
   const num = bars.map((b, i) => {
     if (i < 3) return 0;
     const w = (x) => bars[x].c - bars[x].o;
@@ -1013,6 +1093,7 @@ export function mode(src, n = 20, dp = 1) {
 /* ---- the families ---- */
 
 export function macd(bars, fast = 12, slow = 26, signal = 9) {
+  bars = closeBars(bars);
   const close = bars.map((b) => b.c);
   const f = ema(close, fast);
   const s = ema(close, slow);
@@ -1038,6 +1119,7 @@ export function macd(bars, fast = 12, slow = 26, signal = 9) {
 const vol = (b) => (b.v === null || b.v === undefined || !isFinite(b.v) ? null : b.v);
 
 export function obv(bars) {
+  bars = requireBars(bars, "obv");
   const out = new Array(bars.length).fill(null);
   /* Seeded with the first bar's volume, matching TA-Lib. Starting at zero left every
      value a constant offset below the reference — harmless to a crossover, wrong to
@@ -1061,6 +1143,7 @@ export function obv(bars) {
    because a library that is silently a hair different from the reference for its first
    fifty bars is a library somebody will file an issue about, and they would be right. */
 export function rsi(bars, n = 14) {
+  bars = closeBars(bars);
   const gains = [], losses = [];
   for (let i = 0; i < bars.length; i++) {
     const d = i === 0 ? 0 : bars[i].c - bars[i - 1].c;
@@ -1084,6 +1167,7 @@ export function rsi(bars, n = 14) {
    right and they are different outputs, so the difference is named here rather than
    found by someone comparing one against the other. */
 export function stochRsi(bars, n = 14, k = 3, d = 3) {
+  bars = closeBars(bars);
   const r = rsi(bars, n);
   const raw = r.map((v, i) => {
     if (v === null || i < n * 2 - 2) return null;
@@ -1098,6 +1182,7 @@ export function stochRsi(bars, n = 14, k = 3, d = 3) {
 }
 
 export function mfi(bars, n = 14) {
+  bars = requireBars(bars, "mfi");
   const tp = bars.map((b) => (b.h + b.l + b.c) / 3);
   const pos = [], neg = [];
   const gap = new Array(bars.length).fill(false);
@@ -1120,14 +1205,29 @@ export function mfi(bars, n = 14) {
   });
 }
 
-export function donchian(bars, n = 20) {
+export function donchian(bars, n = 20, prior = false) {
+  bars = requireBars(bars, "donchian");
   const h = bars.map((b) => b.h), l = bars.map((b) => b.l);
-  const upper = bars.map((_, i) => (i < n - 1 ? null : highest(h, i, n)));
-  const lower = bars.map((_, i) => (i < n - 1 ? null : lowest(l, i, n)));
+  /* `prior` moves the window back one bar, so the channel is the one that stood before
+     the bar being tested.
+   *
+   * The default includes the current bar, which is the channel a chart draws. It is also
+   * the channel that makes a breakout test impossible to satisfy: `close[i] > upper[i]`
+   * asks whether the bar closed above the highest high of a window containing its own
+   * high. Over 6,126 daily bars of one instrument that fires 0 times at n = 20, against
+   * 430 for the window that ends at the previous bar.
+   *
+   * Both are wanted and neither is a mistake, so the default is unchanged and the rule
+   * version is asked for. See eqdoc/indicato#1. */
+  const end = prior ? 1 : 0;
+  const ready = (i) => i >= n - 1 + end;
+  const upper = bars.map((_, i) => (ready(i) ? highest(h, i - end, n) : null));
+  const lower = bars.map((_, i) => (ready(i) ? lowest(l, i - end, n) : null));
   return { upper, lower };
 }
 
 export function bollinger(bars, n = 20, mult = 2) {
+  bars = closeBars(bars);
   const close = bars.map((b) => b.c);
   const mid = sma(close, n);
   const dev = close.map((_, i) => {
@@ -1152,6 +1252,7 @@ export function bollinger(bars, n = 20, mult = 2) {
    stock, for ever, and silently.
    days, so a calendar year would quietly be a fourteen-month high. */
 export function yearBand(bars, n = 252) {
+  bars = requireBars(bars, "yearBand");
   const h = bars.map((b) => b.h), l = bars.map((b) => b.l);
   const span = Math.min(n, bars.length);
   return {
@@ -1161,6 +1262,7 @@ export function yearBand(bars, n = 252) {
 }
 
 export function dmi(bars, n = 14) {
+  bars = requireBars(bars, "dmi");
   const plus = [], minus = [];
   for (let i = 0; i < bars.length; i++) {
     if (i === 0) { plus.push(0); minus.push(0); continue; }
@@ -1191,6 +1293,7 @@ export function dmi(bars, n = 14) {
    full rather than approximated: the whole content of the indicator is where it
    flips, and a flip one bar early is the only thing a reader would check. */
 export function psar(bars, step = 0.02, max = 0.2) {
+  bars = requireBars(bars, "psar");
   const out = new Array(bars.length).fill(null);
   if (bars.length < 3) return out;
   let up = bars[1].c >= bars[0].c;
@@ -1215,6 +1318,7 @@ export function psar(bars, step = 0.02, max = 0.2) {
 }
 
 export function supertrend(bars, n = 10, mult = 3) {
+  bars = requireBars(bars, "supertrend");
   const a = atr(bars, n);
   const line = new Array(bars.length).fill(null);
   const dir = new Array(bars.length).fill(null);
@@ -1240,6 +1344,7 @@ export function supertrend(bars, n = 10, mult = 3) {
    of empty space to the right of the last candle. The two spans are drawn at the
    bar they were computed on, which is the honest version of the same lines. */
 export function ichimoku(bars, conv = 9, base = 26, spanB = 52) {
+  bars = requireBars(bars, "ichimoku");
   const h = bars.map((b) => b.h), l = bars.map((b) => b.l);
   const mid = (n) => bars.map((_, i) => {
     if (i < n - 1) return null;

@@ -39,6 +39,18 @@ Full signatures: [docs/reference.md](./docs/reference.md).
 
 A bar is `{ o, h, l, c, v }`, oldest first. Volume may be omitted where unused.
 
+The close-based indicators — `rsi`, `bollinger`, `macd`, `stochRsi`, `crsi`, `bbWidth`,
+`bbPercent`, `envelopes`, `ulcerIndex`, `historicalVolatility` — also take a plain array
+of numbers, since the close is all they read:
+
+```js
+rsi([44.34, 44.09, 44.15, /* ... */], 14);   // same answer as bars
+```
+
+Anything that reads the high, low or volume refuses a bare series rather than treating
+each number as a flat bar. An ATR whose high, low and close are one number is not a
+rougher ATR; it is zero.
+
 The library computes. It does not fetch, sort, validate or cache.
 
 ## Output

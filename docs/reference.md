@@ -45,7 +45,7 @@ That document counts 73 verified *series* where this table counts 58 verified
 | [`crsi`](#crsi) | `(bars, rsiLen = 3, streakLen = 2, rankLen = 100)` | 🟡 scaled |
 | [`dema`](#dema) | `(src, n)` | ✅ exact |
 | [`dmi`](#dmi) | `(bars, n = 14)` | ✅ exact |
-| [`donchian`](#donchian) | `(bars, n = 20)` | ⚪ by definition |
+| [`donchian`](#donchian) | `(bars, n = 20, prior = false)` | ⚪ by definition |
 | [`dpo`](#dpo) | `(src, n = 20)` | ✅ exact |
 | [`elderRay`](#elderRay) | `(bars, n = 13)` | ✅ exact |
 | [`ema`](#ema) | `(values, n)` | ✅ exact |
@@ -449,7 +449,7 @@ dmi(bars, n)
 ```js
 import { donchian } from "indicato";
 
-donchian(bars, n)
+donchian(bars, n, prior)
 ```
 
 **⚪ by definition** — Follows its published formula. Held by the property tests — causality, warmup, range and flat-series identity.
