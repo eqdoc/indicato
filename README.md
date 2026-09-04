@@ -153,6 +153,22 @@ stdev        standard deviation             median       rolling median
 mode         rolling mode
 ```
 
+## Using it from an AI assistant
+
+[indicato-mcp](https://github.com/eqdoc/indicato-mcp) is a Model Context Protocol server
+that exposes these functions to Claude, ChatGPT or any MCP client. It has no network
+access — you pass bars inline or point it at a CSV on your machine.
+
+```
+claude mcp add indicato -- npx -y indicato-mcp
+```
+
+## Documentation
+
+[Reference](./docs/reference.md) — every function, its parameters and return shape.
+[Accuracy notes](./docs/accuracy.md) — how each one is pinned down, and where conventions
+differ between implementations.
+
 ## Tests
 
 ```bash
