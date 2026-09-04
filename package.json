@@ -1,0 +1,47 @@
+{
+  "name": "indicato",
+  "version": "0.1.0",
+  "description": "Technical indicators for JavaScript. 86 of them, verified against TA-Lib, and proven not to read the future.",
+  "type": "module",
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "files": [
+    "src",
+    "docs",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "docs": "node scripts/build-docs.mjs",
+    "pretest": "node scripts/build-docs.mjs"
+  },
+  "keywords": [
+    "technical-analysis",
+    "indicators",
+    "trading",
+    "finance",
+    "backtesting",
+    "rsi",
+    "macd",
+    "bollinger-bands",
+    "supertrend",
+    "ichimoku",
+    "talib"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/eqdoc/indicato.git"
+  },
+  "homepage": "https://github.com/eqdoc/indicato",
+  "bugs": {
+    "url": "https://github.com/eqdoc/indicato/issues"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
