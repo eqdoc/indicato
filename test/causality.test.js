@@ -101,6 +101,13 @@ test("every exported function is covered by the causality check", () => {
   /* An export with no entry above is an unproven claim shipped as a fact. */
   const exported = Object.keys(ta).filter((k) => typeof ta[k] === "function");
   const helpers = new Set(["highest", "lowest", "trueRange", "rma", "stdev", "vol"]);
+  /* The candle, event and chart-pattern functions do not return one number per bar, so they are held by their own
+     causality tests: candles-talib-parity.test.js, events.test.js, patterns.test.js. */
+  for (const n of ["CANDLE_PATTERNS", "abandonedBaby", "candleLookback", "candlesAt", "darkCloudCover", "engulfing", "eveningDojiStar",
+    "eveningStar", "hammer", "hangingMan", "harami", "invertedHammer", "ladderBottom", "marubozu", "matHold", "morningDojiStar",
+    "morningStar", "piercing", "shootingStar", "threeBlackCrows", "threeInside", "threeOutside", "threeWhiteSoldiers",
+    "DIV_MAX", "DIV_MIN", "PIVOT_K", "WARMUP", "EVENT_SIGNALS", "eventConfirmations", "fractalPivots", "indicatorEvents", "volumeRatio",
+    "chartBars", "detectPatterns", "weeklyBars", "zigzag"]) helpers.add(n);
   const uncovered = exported.filter((n) => !(n in CALLS) && !helpers.has(n));
   assert.deepEqual(uncovered, [], "exported but never checked for causality");
 });

@@ -91,3 +91,32 @@ export {
   yearBand,
   zlema,
 } from "./indicators.js";
+
+/* Candlestick patterns (TA-Lib's definitions), indicator events, and chart patterns with their geometry. New in 0.2. */
+export {
+  CANDLE_PATTERNS,
+  abandonedBaby,
+  candleLookback,
+  candlesAt,
+  darkCloudCover,
+  engulfing,
+  eveningDojiStar,
+  eveningStar,
+  hammer,
+  hangingMan,
+  harami,
+  invertedHammer,
+  ladderBottom,
+  marubozu,
+  matHold,
+  morningDojiStar,
+  morningStar,
+  piercing,
+  shootingStar,
+  threeBlackCrows,
+  threeInside,
+  threeOutside,
+  threeWhiteSoldiers,
+} from "./candles.js";
+export { DIV_MAX, DIV_MIN, EVENT_SIGNALS, PIVOT_K, WARMUP, eventConfirmations, fractalPivots, indicatorEvents, volumeRatio } from "./events.js";
+export { chartBars, detectPatterns, weeklyBars, zigzag } from "./patterns.js";

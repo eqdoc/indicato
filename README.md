@@ -165,6 +165,69 @@ stdev        standard deviation             median       rolling median
 mode         rolling mode
 ```
 
+## Candlestick patterns
+
+Twenty patterns, defined the way TA-Lib defines them, integer for integer.
+
+```js
+import { engulfing, hammer, morningStar, CANDLE_PATTERNS } from "indicato";
+
+engulfing(bars);            // [0, 0, 100, 0, -80, ...]   same length as bars
+hammer(bars);               // [0, 0, 0, 100, ...]
+morningStar(bars, 0.3);     // the star patterns take TA-Lib's penetration
+Object.keys(CANDLE_PATTERNS);
+```
+
+```
+engulfing        hammer            invertedHammer    hangingMan       shootingStar
+piercing         darkCloudCover    morningStar       morningDojiStar  eveningStar
+eveningDojiStar  harami            threeWhiteSoldiers threeBlackCrows threeInside
+threeOutside     abandonedBaby     matHold           ladderBottom     marubozu
+```
+
+A value is +100 or -100 for a bullish or bearish shape, +-80 for the weaker "equal edge" variants TA-Lib marks on
+Engulfing and Harami, 0 where there is none. "Long body" and "very short shadow" are measured against the candles
+before, exactly as TA-Lib measures them, which is why these agree with it on every bar of a million (see
+[accuracy notes](./docs/accuracy.md)). The first `candleLookback(name)` bars are 0.
+
+## Indicator events
+
+Something that happened on one bar, never a state a stock sits in: a stochastic crossing out of oversold, a close
+through the Keltner channel, a price low with a higher RSI low.
+
+```js
+import { indicatorEvents, EVENT_SIGNALS } from "indicato";
+
+const ev = indicatorEvents(bars);
+ev.stoch;                   // [{ i: 133, side: "bull", geometry: null }, ...]
+ev.rsidiv[0].geometry;      // { p1: [bar, price, rsi], p2: [bar, price, rsi] } the two pivots joined
+EVENT_SIGNALS.keltner.names.bull;   // "Closed above the Keltner channel"
+```
+
+Eleven signals: `stoch cci willr aroon keltner rsidiv macddiv vol52 dma200 nr7 gap`. Each is exact and written next to
+its code. Crossings carry a cooldown so a stock that stays in a zone is one event, not six; none fires on more than
+6% of stock-days. Divergences are dated the bar their second pivot is confirmed, never the pivot itself.
+
+## Chart patterns
+
+Head and shoulders (and inverse), double top and bottom, ascending / descending / symmetrical triangles, rising and
+falling wedges, flags and pennants, cup and handle, on daily bars and on the weekly bars built from them, with the
+points and lines a chart needs to draw them.
+
+```js
+import { detectPatterns } from "indicato";
+
+const found = detectPatterns(bars);       // bars carry a date: { d, o, h, l, c, v }
+found[0].name;                            // "Head and shoulders"
+found[0].state;                           // "forming" | "confirmed" | "failed"
+found[0].geometry.points;                 // [{ role: "head", d: "2026-05-30", p: 150.9 }, ...]
+found[0].geometry.lines;                  // [{ role: "neckline", from: { d, p }, to: { d, p } }]
+```
+
+Found on swing pivots scaled to each stock's own volatility. A pattern is `confirmed` only by a close through its line on
+volume at least 1.25 x the 20-session mean; a break with no volume is not reported. They describe past price behaviour;
+none predicts anything.
+
 ## Using it from an AI assistant
 
 [indicato-mcp](https://github.com/eqdoc/indicato-mcp) is a Model Context Protocol server
@@ -188,7 +251,9 @@ npm test
 ```
 
 Every indicator is tested for causality, warmup, output length and range bounds. Accuracy
-notes for individual functions are in [docs/reference.md](./docs/reference.md).
+notes for individual functions are in [docs/reference.md](./docs/reference.md). The candle, event
+and chart-pattern modules are tested against golden fixtures made by TA-Lib and by eqdoc's Python
+scan (`scripts/make-*-fixture.py`), and each is checked not to read a later bar.
 
 ## Versioning
 

@@ -109,3 +109,60 @@ One more, which is a convention rather than a parameter: **`vwap` is cumulative 
 first bar.** Intraday VWAP conventionally resets each session; on daily bars there is no
 session to reset on, so cumulative is the only sensible reading. Feed it minute bars
 expecting a session reset and you will get something different from your broker.
+
+
+## Candlesticks, events and chart patterns (0.2)
+
+### Candlesticks: 20 patterns against TA-Lib 0.7.1
+
+Checked on 1,053 liquid Indian symbols x 5 years of daily bars (1,047,363 bars): the integer at every bar, compared
+with TA-Lib's. **All twenty agree on every bar: no missing, no extra, no different value.** Counts are TA-Lib's non-zero
+outputs (and ours, which are the same).
+
+| pattern | bars | pattern | bars |
+|---|---|---|---|
+| engulfing | 107,129 | morningDojiStar | 1,273 |
+| harami | 80,559 | eveningDojiStar | 2,195 |
+| threeOutside | 42,426 | piercing | 2,093 |
+| marubozu | 28,801 | threeBlackCrows | 225 |
+| hammer | 16,753 | threeWhiteSoldiers | 71 |
+| hangingMan | 14,138 | matHold | 38 |
+| shootingStar | 13,899 | abandonedBaby | 9 |
+| threeInside | 12,872 | ladderBottom | 1,698 |
+| invertedHammer | 10,847 | darkCloudCover | 3,812 |
+| eveningStar | 5,621 | morningStar | 3,742 |
+
+The committed tests use ten companies (1,891 hits) and 89 windows around the hits of the rare patterns, so the four
+that are rare (Three White Soldiers, Abandoned Baby, Mat Hold, Ladder Bottom) are exercised on real hits too.
+The averages TA-Lib compares against are reproduced exactly: "long" is the average real body of the ten candles before,
+"near" a fifth of the average high-low range of the five before, and so on (`src/candles.js` lists them). Two details
+worth knowing: TA-Lib averages the very-short-shadow test over the high-low range, not the real body, for Three Black
+Crows and Ladder Bottom as for the rest (the first version of this port used the real body and was wrong on 214 and 168
+bars: the full-universe run caught it); and Engulfing and Harami return +-80 when an edge of the bodies touches.
+
+Not ported: the other 41 TA-Lib patterns (Doji, Spinning Top, the Kicker family, Tasuki and the rest). The twenty are the
+ones eqdoc's scan has always used; the rest follow the same method.
+
+### Events against the Python scan
+
+`indicatorEvents` against `pipeline/jobs/signal_events.py` (numpy + TA-Lib): **identical on every event on ten companies
+x 600 sessions** (1,664 events, divergence pivots included). Over 222 further symbols (about 5 years each) 50,000+ events
+agree except five stochastic crosses on four symbols that moved by a bar: %K and %D are equal to 1e-13 there (one is a
+near-flat ETF), and a cross decided by that is decided differently. No event is reported before bar 60 in either
+implementation. The MACD line only exists from bar 33 in TA-Lib; here it is masked to match. RSI here is seeded one bar
+earlier than TA-Lib's, so a divergence's RSI value at an early pivot differs a little (0.003 at most in the fixtures).
+
+### Chart patterns against the Python scan
+
+`detectPatterns` against `pipeline/jobs/chart_geometry.py` (numpy only): **55 of 55 detections identical, geometry
+to the cent**, on ten companies at thirty as-of dates each; **406 of 406** on 70 further symbols x 16 as-of runs. The
+least-squares lines and the parabola behind the cup are solved here without a library; they agree with NumPy's to
+rounding, which the golden fixtures pin.
+
+Eyeball precision of the detector (one reviewer, 36 detections from a fresh sample): 33 accepted, 30 on a stricter
+reading. Pennants and ascending triangles are the weakest classes. See eqdoc-api `docs/signals/library-evaluation.md`.
+
+### Speed
+
+1,054 symbols x 520 bars: 20 candle patterns 0.3 s, 11 event signals 0.7 s, chart patterns on daily and weekly bars 0.3 s
+(Node 26 on a laptop); the Python scan does the same work in about 45 s.
