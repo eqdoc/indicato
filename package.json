@@ -1,7 +1,7 @@
 {
   "name": "indicato",
-  "version": "0.1.3",
-  "description": "Technical indicators for JavaScript. 86 of them, verified against TA-Lib, and proven not to read the future.",
+  "version": "0.2.0",
+  "description": "Technical analysis for JavaScript: 89 indicators, all 61 TA-Lib candlestick patterns, indicator events and chart patterns with drawable geometry. Verified against TA-Lib, proven not to read the future. No dependencies.",
   "type": "module",
   "main": "./src/index.js",
   "exports": {
@@ -31,7 +31,10 @@
     "bollinger-bands",
     "supertrend",
     "ichimoku",
-    "talib"
+    "talib",
+    "candlestick-patterns",
+    "chart-patterns",
+    "head-and-shoulders"
   ],
   "license": "MIT",
   "repository": {
