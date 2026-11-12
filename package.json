@@ -1,6 +1,6 @@
 {
   "name": "indicato",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Technical analysis for JavaScript: 89 indicators, all 61 TA-Lib candlestick patterns, indicator events and chart patterns with drawable geometry. Verified against TA-Lib, proven not to read the future. No dependencies.",
   "type": "module",
   "main": "./src/index.js",

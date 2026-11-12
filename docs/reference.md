@@ -27,11 +27,11 @@ That document counts 73 verified *series* where this table counts 58 verified
 | [`alma`](#alma) | `(src, n, offset = 0.85, sigma = 6)` | ✅ exact |
 | [`ao`](#ao) | `(bars)` | ✅ exact |
 | [`aroon`](#aroon) | `(bars, n = 25)` | ✅ exact |
-| [`atr`](#atr) | `(bars, n = 14)` | ✅ exact |
+| [`atr`](#atr) | `(bars, n = 14, opts)` | ✅ exact |
 | [`bbPercent`](#bbPercent) | `(bars, n = 20, mult = 2)` | ✅ exact |
 | [`bbWidth`](#bbWidth) | `(bars, n = 20, mult = 2)` | 🟡 scaled |
 | [`beta`](#beta) | `(a, b, n = 20)` | ⚪ by definition |
-| [`bollinger`](#bollinger) | `(bars, n = 20, mult = 2)` | ✅ exact |
+| [`bollinger`](#bollinger) | `(bars, n = 20, mult = 2, opts)` | ✅ exact |
 | [`bop`](#bop) | `(bars)` | ✅ exact |
 | [`cci`](#cci) | `(bars, n = 20)` | ✅ exact |
 | [`chaikinOsc`](#chaikinOsc) | `(bars, fast = 3, slow = 10)` | ✅ exact |
@@ -44,7 +44,7 @@ That document counts 73 verified *series* where this table counts 58 verified
 | [`correlation`](#correlation) | `(a, b, n = 20)` | ⚪ by definition |
 | [`crsi`](#crsi) | `(bars, rsiLen = 3, streakLen = 2, rankLen = 100)` | 🟡 scaled |
 | [`dema`](#dema) | `(src, n)` | ✅ exact |
-| [`dmi`](#dmi) | `(bars, n = 14)` | ✅ exact |
+| [`dmi`](#dmi) | `(bars, n = 14, opts)` | ✅ exact |
 | [`donchian`](#donchian) | `(bars, n = 20, prior = false)` | ⚪ by definition |
 | [`dpo`](#dpo) | `(src, n = 20)` | ✅ exact |
 | [`elderRay`](#elderRay) | `(bars, n = 13)` | ✅ exact |
@@ -64,7 +64,7 @@ That document counts 73 verified *series* where this table counts 58 verified
 | [`kst`](#kst) | `(src)` | 🟡 scaled |
 | [`linreg`](#linreg) | `(src, n = 14)` | ✅ exact |
 | [`linregSlope`](#linregSlope) | `(src, n = 14)` | ✅ exact |
-| [`macd`](#macd) | `(bars, fast = 12, slow = 26, signal = 9)` | ✅ exact |
+| [`macd`](#macd) | `(bars, fast = 12, slow = 26, signal = 9, opts)` | ✅ exact |
 | [`massIndex`](#massIndex) | `(bars, n = 25, e = 9)` | ✅ exact |
 | [`mcginley`](#mcginley) | `(src, n = 14)` | ✅ exact |
 | [`median`](#median) | `(src, n = 14)` | ✅ exact |
@@ -77,19 +77,19 @@ That document counts 73 verified *series* where this table counts 58 verified
 | [`pivotPoints`](#pivotPoints) | `(bars)` | ⚪ by definition |
 | [`po`](#po) | `(src, fast = 12, slow = 26)` | ✅ exact |
 | [`ppo`](#ppo) | `(src, fast = 12, slow = 26)` | ✅ exact |
-| [`psar`](#psar) | `(bars, step = 0.02, max = 0.2)` | 🟡 scaled |
+| [`psar`](#psar) | `(bars, step = 0.02, max = 0.2, opts)` | 🟡 scaled |
 | [`pvi`](#pvi) | `(bars)` | 🟡 scaled |
 | [`pvt`](#pvt) | `(bars)` | ✅ exact |
 | [`roc`](#roc) | `(src, n = 12)` | ✅ exact |
-| [`rsi`](#rsi) | `(bars, n = 14)` | ✅ exact |
+| [`rsi`](#rsi) | `(bars, n = 14, opts)` | ✅ exact |
 | [`rvi`](#rvi) | `(bars, n = 10)` | ✅ exact |
 | [`rwi`](#rwi) | `(bars, n = 14)` | 🟡 scaled |
-| [`sma`](#sma) | `(values, n)` | ✅ exact |
+| [`sma`](#sma) | `(values, n, opts)` | ✅ exact |
 | [`starc`](#starc) | `(bars, n = 15, atrLen = 15, mult = 2)` | ⚪ by definition |
 | [`stc`](#stc) | `(src, fast = 23, slow = 50, cycle = 10)` | ✅ exact |
 | [`stochastic`](#stochastic) | `(bars, n = 14, k = 3, d = 3)` | ✅ exact |
-| [`stochRsi`](#stochRsi) | `(bars, n = 14, k = 3, d = 3)` | 🟡 scaled |
-| [`supertrend`](#supertrend) | `(bars, n = 10, mult = 3)` | ✅ exact |
+| [`stochRsi`](#stochRsi) | `(bars, n = 14, k = 3, d = 3, opts)` | 🟡 scaled |
+| [`supertrend`](#supertrend) | `(bars, n = 10, mult = 3, opts)` | ✅ exact |
 | [`t3`](#t3) | `(src, n = 5, v = 0.7)` | ✅ exact |
 | [`tema`](#tema) | `(src, n)` | ✅ exact |
 | [`trima`](#trima) | `(src, n)` | ✅ exact |
@@ -200,12 +200,17 @@ Aroon — Chande. How long since the window's high and low, as a percentage. Bot
 ```js
 import { atr } from "indicato";
 
-atr(bars, n)
+atr(bars, n, opts)
 ```
 
 **✅ exact** — Pinned to the value across 6,126 bars of real market history.
 
 Exported since Keltner needs it and a reader may want it on its own: the size of a typical session, in rupees. TRUE range, not high minus low — a share that gapped 100 to 130 overnight then traded 130-132 had a 2-rupee day by high minus low and a 32-rupee day in truth.
+
+Wilder's smoothing, seeded with the mean of the true ranges of bars 0..n-1, so the
+first value is at bar n-1. { compat: "talib" } is TA-Lib's: bar 0 has no previous
+close, so its range is left out, the mean is of bars 1..n and the first value is at
+bar n. The seed's weight decays by (n-1)/n a bar, so the two converge, slowly.
 
 ---
 
@@ -252,10 +257,12 @@ beta(a, b, n)
 ```js
 import { bollinger } from "indicato";
 
-bollinger(bars, n, mult)
+bollinger(bars, n, mult, opts)
 ```
 
 **✅ exact** — Pinned to the value across 6,126 bars of real market history.
+
+Bollinger bands: a moving average and mult standard deviations either side. Default: the deviation is the root of the mean of the squared deviations from the mean. { compat: "talib" } is TA-Lib's BBANDS: the running-total mean, and the root of (mean of the squares less the square of the mean), taken as 0 when that is under 1e-8. The two are the same number in exact arithmetic and differ by about 1e-10 on a share; on a series that barely moves (a liquid fund at 1,100) the subtraction cancels and TA-Lib's bands are visibly different.
 
 ---
 
@@ -437,10 +444,12 @@ Double and triple exponential — Patrick Mulloy, 1994. Subtracting the lag of a
 ```js
 import { dmi } from "indicato";
 
-dmi(bars, n)
+dmi(bars, n, opts)
 ```
 
 **✅ exact** — Pinned to the value across 6,126 bars of real market history.
+
+Directional movement: +DI, -DI and ADX. Default: Wilder's averages seeded at bar n-1. { compat: "talib" } is TA-Lib's PLUS_DI, MINUS_DI and ADX: the first n-1 movements are summed, each later one enters as sum - sum/n + x, +DI and -DI start at bar n and ADX (the mean of the first n DX values, then smoothed) at bar 2n-1. Same shape, differences of 1e-8 that decay slowly.
 
 ---
 
@@ -711,12 +720,12 @@ linregSlope(src, n)
 ```js
 import { macd } from "indicato";
 
-macd(bars, fast, slow, signal)
+macd(bars, fast, slow, signal, opts)
 ```
 
 **✅ exact** — Pinned to the value across 6,126 bars of real market history.
 
----- the families ----
+MACD: the fast EMA less the slow one, its EMA as the signal, and the gap as the histogram. Default: each EMA is seeded at its own bar n-1, so the line starts at bar slow-1 and the signal after a further signal-1 bars. { compat: "talib" } seeds the fast EMA at bar slow-1 (from the mean of the fast-period closes ending there) and the signal with the mean of the first signal MACD values: the three series start together at bar slow+signal-2 (33), and a 40-bar listing is read the way TA-Lib reads it.
 
 ---
 
@@ -883,7 +892,7 @@ Percentage Price Oscillator, and its absolute-difference sibling.
 ```js
 import { psar } from "indicato";
 
-psar(bars, step, max)
+psar(bars, step, max, opts)
 ```
 
 **🟡 scaled** — Differs on 24 bars of 5,826, median difference 0.0000 — all at a reversal, where a new leg's starting direction is an implementation choice.
@@ -935,7 +944,7 @@ Rate of change, and momentum's plain difference.
 ```js
 import { rsi } from "indicato";
 
-rsi(bars, n)
+rsi(bars, n, opts)
 ```
 
 **✅ exact** — Pinned to the value across 6,126 bars of real market history.
@@ -984,10 +993,12 @@ Random Walk Index — Poulos. How far price travelled against how far a random w
 ```js
 import { sma } from "indicato";
 
-sma(values, n)
+sma(values, n, opts)
 ```
 
 **✅ exact** — Pinned to the value across 6,126 bars of real market history.
+
+Simple moving average. Both modes keep a running total; they differ in the order of the two roundings. Default: the new value is added and the oldest taken off before the division. { compat: "talib" } is TA-Lib's order: divide first, and only then let the oldest leave the total. The results agree to about 1e-13 and drift apart to a few 1e-12 over thousands of bars; what the order decides is a tie a hair either side of a price (a close exactly on its own average), which is why a scan held to TA-Lib's rows asks for it.
 
 ---
 
@@ -1038,7 +1049,7 @@ The plain stochastic — where the close sits inside the recent high-low range. 
 ```js
 import { stochRsi } from "indicato";
 
-stochRsi(bars, n, k, d)
+stochRsi(bars, n, k, d, opts)
 ```
 
 **🟡 scaled** — Returns the smoothed %K a chart draws; TA-Lib's STOCHRSI returns the raw fastk. Computed the same way they are identical.
@@ -1052,7 +1063,7 @@ STOCHASTIC RSI. This returns the SMOOTHED %K and its %D — the pair a chart dra
 ```js
 import { supertrend } from "indicato";
 
-supertrend(bars, n, mult)
+supertrend(bars, n, mult, opts)
 ```
 
 **✅ exact** — Pinned to the value across 6,126 bars of real market history.

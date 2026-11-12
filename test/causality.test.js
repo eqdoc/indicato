@@ -111,3 +111,35 @@ test("every exported function is covered by the causality check", () => {
   const uncovered = exported.filter((n) => !(n in CALLS) && !helpers.has(n));
   assert.deepEqual(uncovered, [], "exported but never checked for causality");
 });
+
+/* THE SAME PROMISE IN TA-LIB MODE. { compat: "talib" } is a second implementation of nine functions, so it gets its own proof.
+   The bar is higher than above: the same operations in the same order, so a series computed from the first 800 bars must equal,
+   exactly, the same series computed from all 900 -- at every index, warm-up included (no 300-bar grace, no tolerance). */
+const T = { compat: "talib" };
+const TALIB_CALLS = {
+  sma: (b) => ta.sma(closeOf(b), 20, T), rsi: (b) => ta.rsi(b, 14, T), atr: (b) => ta.atr(b, 14, T),
+  macd: (b) => ta.macd(b, 12, 26, 9, T).line, macdSignal: (b) => ta.macd(b, 12, 26, 9, T).signal, macdHist: (b) => ta.macd(b, 12, 26, 9, T).hist,
+  bollinger: (b) => ta.bollinger(b, 20, 2, T).upper, bollingerLower: (b) => ta.bollinger(b, 20, 2, T).lower,
+  dmi: (b) => ta.dmi(b, 14, T).adx, pdi: (b) => ta.dmi(b, 14, T).pdi, mdi: (b) => ta.dmi(b, 14, T).mdi,
+  psar: (b) => ta.psar(b, 0.02, 0.2, T), stochRsiK: (b) => ta.stochRsi(b, 14, 5, 3, T).k, stochRsiD: (b) => ta.stochRsi(b, 14, 5, 3, T).d,
+  supertrend: (b) => ta.supertrend(b, 10, 3, T).line, supertrendUp: (b) => ta.supertrend(b, 10, 3, T).up,
+};
+
+test("TA-Lib mode: no series changes its past when the future arrives, at any index", () => {
+  const guilty = [];
+  for (const [name, call] of Object.entries(TALIB_CALLS)) {
+    const full = call(all), part = call(all.slice(0, 800));
+    if (full.length !== all.length || part.length !== 800) { guilty.push(`${name} length`); continue; }
+    for (let i = 0; i < 800; i++) if (full[i] !== part[i]) { guilty.push(`${name} @${i}`); break; }
+  }
+  assert.deepEqual(guilty, [], "these read the future in TA-Lib mode");
+});
+
+test("TA-Lib mode: nothing is emitted before TA-Lib's first bar, and every bar after it has a value", () => {
+  const first = { sma: 19, rsi: 14, atr: 14, macd: 33, macdSignal: 33, macdHist: 33, bollinger: 19, bollingerLower: 19, dmi: 27, pdi: 14, mdi: 14, psar: 1, stochRsiK: 20, stochRsiD: 20, supertrend: 10, supertrendUp: 10 };
+  for (const [name, at] of Object.entries(first)) {
+    const out = TALIB_CALLS[name](all);
+    assert.equal(out.findIndex((v) => v !== null), at, `${name}: first value`);
+    assert.ok(out.slice(at).every((v) => v !== null && (typeof v === "boolean" || Number.isFinite(v))), `${name}: a gap or a non-finite value after the first`);
+  }
+});

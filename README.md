@@ -93,6 +93,39 @@ yearBand(weekly, 52);                    // window is in bars
 
 `vwap` accumulates from the first bar supplied; it has no session reset.
 
+## TA-Lib compatibility mode
+
+indicato's defaults are Wilder's and Appel's definitions written the plainest way. TA-Lib writes the same indicators with a
+different seed and a different first bar, so the two agree to many digits, not all of them, and a rule that fires on a cross
+or a threshold can fire a bar apart. If you need TA-Lib's numbers (a scan held to a TA-Lib scan's rows, a backtest that must
+reproduce one), ask for them:
+
+```js
+rsi(bars, 14, { compat: "talib" });                  // TA-Lib 0.7.1's RSI, first value at bar 14 (the default: bar 13)
+macd(bars, 12, 26, 9, { compat: "talib" });          // line, signal and hist all start at bar 33
+stochRsi(bars, 14, 5, 3, { compat: "talib" });       // TA-Lib's STOCHRSI(14, 5, 3): raw fastk, not the smoothed %K
+```
+
+The options object is always the last argument. It takes the same shapes as the default (bars, or a plain series of closes
+where only the close is read), returns the same shapes (`null` before the first value) and equals TA-Lib 0.7.1 to 1e-12 on
+every bar, the first value included. The default, with no options, is the 0.2.0 output to the last bit.
+
+| function | what differs by default | in `compat: "talib"` |
+|---|---|---|
+| `rsi` | Wilder's average seeded one bar earlier (first value at bar n-1); the seed's weight decays by (n-1)/n a bar | first n changes averaged, first value at bar n |
+| `atr` | bar 0's true range is in the first average | bar 1..n, first value at bar n |
+| `dmi` | seeded as `atr` is; ADX smooths twice, so the gap is larger | TA-Lib's PLUS_DI, MINUS_DI and ADX: +DI/-DI from bar n, ADX from bar 2n-1 |
+| `macd` | the fast EMA is seeded at bar fast-1 | both EMAs seeded at bar slow-1; line, signal and hist start together at slow+signal-2 (33) |
+| `bollinger` | squared deviations from the mean | mean of squares less square of the mean, and a variance under 1e-8 is 0 |
+| `sma` | add the new, take off the oldest, divide | divide, then take off the oldest (TA-Lib's order) |
+| `psar` | the first leg follows the second close against the first | the first leg is decided by the first bar's minus-DM |
+| `stochRsi` | returns the smoothed %K and its mean | the raw fastk over the last `k` RSI values and its `d`-bar mean; `k` is TA-Lib's `fastk_period` (its default is 5) |
+| `supertrend` | ATR from bar n-1; opens in the direction of the close against the midpoint | TA-Lib's ATR (bar n), and the first leg is a downtrend |
+
+`supertrend` is the one with no TA-Lib function: its mode is the Supertrend a Python scan writes on `talib.ATR`, which is the
+combination most TA-Lib users mean. Why each default differs, and how big the gap is, is in
+[docs/accuracy.md](./docs/accuracy.md#ta-lib-compatibility-mode). An unknown `compat` value throws.
+
 ## Indicators
 
 ### Overlap studies
@@ -273,6 +306,10 @@ scan (`scripts/make-*-fixture.py`), and each is checked not to read a later bar.
 
 Semantic versioning. Any change to numerical output is a major version, including a
 correction — reproducing an old backtest means pinning the version that produced it.
+
+**0.3.0** adds one thing: the `{ compat: "talib" }` option on `sma`, `rsi`, `atr`, `dmi`, `macd`, `bollinger`, `stochRsi`, `psar` and
+`supertrend` (see above), so a scan held to TA-Lib can use indicato alone. No default output changed: `test/defaults-pinned.test.js`
+holds a hash of every indicator's 0.2.0 output on the committed fixtures and fails if a digit moves.
 
 ## Licence
 

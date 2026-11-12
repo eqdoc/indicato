@@ -28,7 +28,9 @@ Vortex (+VI and −VI), Awesome Oscillator, Mass Index.
 
 ## Deliberate differences
 
-Each is a choice, and each is here so it is not "fixed" by accident.
+Each is a choice, and each is here so it is not "fixed" by accident. RSI, Stochastic RSI and PSAR below can be switched to TA-Lib's definition, and so can ATR, ±DI/ADX, MACD, Bollinger, SMA and
+Supertrend, which differ from it only in warm-up and the last digits: see
+[TA-Lib compatibility mode](#ta-lib-compatibility-mode-03). The defaults stay as they are.
 
 | indicator | difference | why |
 |---|---|---|
@@ -191,3 +193,56 @@ reading. Pennants and ascending triangles are the weakest classes. See eqdoc-api
 
 1,054 symbols x 520 bars: 20 candle patterns 0.3 s, 11 event signals 0.7 s, chart patterns on daily and weekly bars 0.3 s
 (Node 26 on a laptop); the Python scan does the same work in about 45 s.
+
+
+## TA-Lib compatibility mode (0.3)
+
+Nine functions take `{ compat: "talib" }` as their last argument (`sma`, `rsi`, `atr`, `dmi`, `macd`, `bollinger`, `stochRsi`, `psar`,
+`supertrend`). In that mode each is TA-Lib 0.7.1's own arithmetic, in TA-Lib's order of operations. Without it nothing changes: the
+default output of all 89 indicators is the 0.2.0 output, to the last bit (`test/defaults-pinned.test.js`).
+
+**Why the defaults differ at all.** They are the textbook definitions written the plain way, and the plain way has choices TA-Lib
+made otherwise: where the first average is seeded, which bar the first value lands on, in what order a running sum is rounded. The
+indicator is the same; its first values, and its last digits, are not. A reader comparing a chart is not affected. A scan that fires
+on `rsi > 70` or `close > upper band` and is held to a TA-Lib scan's rows can be, by a bar or a day, and that is what the mode is for.
+
+**Measured on Reliance, 6,126 bars: the largest gap between the default and TA-Lib, in the hundred bars starting at bar...**
+
+| function | 40 | 100 | 300 | 1,000 | why it is there |
+|---|--:|--:|--:|--:|---|
+| `rsi` 14 | 1.3e-1 | 1.9e-3 | 7e-10 | 1e-14 | the seed sits a bar earlier and decays by 13/14 a bar |
+| `atr` 14 | 1.4e-2 | 1.7e-4 | 6e-11 | 0 | bar 0's true range enters the first average |
+| `+DI` / `-DI` / `ADX` 14 | 2e-1 / 1e-1 / 9e-2 | 1.4e-3 / 2e-3 / 1.1e-3 | 8e-10 / 8e-10 / 4e-10 | 1e-14 | the same seed; ADX smooths twice |
+| `macd` 12/26/9 (line) | 2.9e-2 | 1.3e-6 | 3e-14 | 6e-14 | the fast EMA is seeded at bar 11, TA-Lib's at bar 25; the gap decays by 11/13 a bar |
+| `bollinger` 20, 2 (upper) | 4e-12 | 1.3e-12 | 1.3e-11 | 5e-11 | squared deviations vs mean of squares less square of the mean |
+| `sma` 20 | 3e-14 | 4e-14 | 5e-14 | 3e-13 | the same running total rounded in a different order; they drift apart slowly |
+
+Four are not small numbers that decay:
+
+- **First value.** `rsi`, `atr`, `dmi` and `supertrend` start at bar n in TA-Lib, one earlier by default; `macd` starts at bar 33
+  for all three series, where the default's line starts at bar 25. A new listing of 40-80 bars is read differently in its first
+  weeks, which a long series never shows.
+- **Parabolic SAR** differs on 70 of 6,126 bars, around reversals, and on 20 of them the SAR sits on the other side of the close. The
+  cause is the starting direction of a leg: TA-Lib reads the first bar's minus-DM; the default reads the second close against the
+  first. A flip decided one bar apart is a different signal date.
+- **Stochastic RSI** is a different output. The default returns the smoothed %K a chart draws (n, 3, 3); TA-Lib's STOCHRSI returns
+  the raw fastk over `fastk_period` (5 by default) RSI values and its mean. In compat mode `k` is that `fastk_period`; pass 5 for
+  TA-Lib's defaults. The first value is at bar 20, not 26.
+- **Bollinger** bands differ by 1e-10 on a share and a lot on a series that barely moves. TA-Lib takes the mean of the squares less
+  the square of the mean, which cancels badly on a liquid fund (price 1,100, variance 1e-6) and treats a variance under 1e-8 as
+  zero. The default sums squared deviations. Neither is wrong; only one is TA-Lib's.
+
+**Supertrend** has no TA-Lib function. Its compat mode is the Supertrend a Python scan writes on `talib.ATR`: the same bands and
+flip rules as the default, TA-Lib's ATR under them, and a first leg that is always a downtrend. (The reference is eqdoc's
+`pipeline/jobs/pattern_scan.py` `supertrend()`, reproduced in `scripts/make-talib-fixture.py`.) The default opens in the direction of
+the close against the midpoint instead; the two agree from the first flip on.
+
+**How it is held.** `scripts/make-talib-fixture.py` runs Python TA-Lib 0.7.1 over ten companies (600 sessions), Reliance (1,000), a
+45-bar new listing and five synthetic series made to reach the corners (a liquid fund, a flat run where TA_IS_ZERO matters, and
+the three ways SAR starts), with two parameter sets for each function on three companies and every synthetic series. `test/talib-compat.test.js`
+requires `null` exactly where TA-Lib has NaN (so the first value is on the same bar) and `|got - want| <= 1e-12 * max(1, |want|)`
+elsewhere. Worst gap seen: `rsi`, `atr`, `bollinger`, `sma`, `stochRsi`, `supertrend` 0 (bit for bit); `psar` 2e-16; `dmi` 2e-15; `macd`
+9e-13. MACD is the one that is not bit-exact, and the reason is the compiler: the TA-Lib arm64 wheel the fixtures were made with fuses
+the multiply and add in its fast-EMA loop (reproducing that with a fused multiply-add gives zero difference), which JavaScript has
+no way to do, so the MACD line can be an ulp of the price away (4.5e-13 on a price of 3,000). Series computed from the first N bars
+equal the same series computed from all of them at every index, with no tolerance (`test/causality.test.js`).
