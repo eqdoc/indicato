@@ -1,6 +1,6 @@
 /* Candlestick patterns, defined the way TA-Lib defines them.
 
-   Twenty patterns: the reversal and continuation shapes that traders actually name. Every one returns an
+   Sixty-one patterns: all of TA-Lib's. The first twenty (CURATED_CANDLES) are the reversal and continuation shapes traders actually name. Every one returns an
    array the same length as the bars, with 0 where the pattern is absent and a signed integer where it is
    present: +100 / -100 for a bullish / bearish shape, +-80 for the weaker "equal edge" variants TA-Lib marks on
    Engulfing and Harami. The sign is the DIRECTION of the shape, not advice.
@@ -24,48 +24,18 @@
      ShadowLong      real body         0  1.0      (period 0: the candle's own measure, not an average)
    "Real body" is |close - open|; "high-low" is high - low. */
 
+import { SET, runCandle } from "./candle-kit.js";
 import { requireBars } from "./guard.js";
+import { LOOKBACK_G1, doji, dragonflyDoji, gravestoneDoji, longLeggedDoji, rickshawMan, highWave, spinningTop, shortLine, longLine, beltHold, closingMarubozu, takuri } from "./candles-g1.js";
+import { LOOKBACK_G2, dojiStar, haramiCross, homingPigeon, inNeck, onNeck, thrusting, counterattack, matchingLow, separatingLines, kicking, kickingByLength } from "./candles-g2.js";
+import { LOOKBACK_G3, twoCrows, upsideGapTwoCrows, threeStarsInSouth, identicalThreeCrows, stickSandwich, uniqueThreeRiver, triStar, tasukiGap, advanceBlock, stalledPattern, gapSideSideWhite } from "./candles-g3.js";
+import { LOOKBACK_G4, threeLineStrike, breakaway, concealingBabySwallow, riseFallThreeMethods, xSideGapThreeMethods, hikkake, hikkakeMod } from "./candles-g4.js";
 
-const SETTINGS = {
-  BodyLong: { range: "body", period: 10, factor: 1.0 },
-  BodyShort: { range: "body", period: 10, factor: 1.0 },
-  BodyDoji: { range: "hl", period: 10, factor: 0.1 },
-  ShadowLong: { range: "body", period: 0, factor: 1.0 },
-  ShadowVeryShort: { range: "hl", period: 10, factor: 0.1 },
-  Near: { range: "hl", period: 5, factor: 0.2 },
-  Far: { range: "hl", period: 5, factor: 0.6 },
-};
-
-function context(bars) {
-  const n = bars.length;
-  const o = new Array(n), h = new Array(n), l = new Array(n), c = new Array(n);
-  for (let i = 0; i < n; i++) { o[i] = bars[i].o; h[i] = bars[i].h; l[i] = bars[i].l; c[i] = bars[i].c; }
-  const body = (i) => Math.abs(c[i] - o[i]);
-  const hl = (i) => h[i] - l[i];
-  const rng = (kind, i) => (kind === "body" ? body(i) : hl(i));
-  /* The averaged measure for candle p: factor x (sum of the measure over the `period` candles BEFORE p) / period.
-     With period 0 it is the candle's own measure. */
-  const avg = (s, p) => {
-    if (s.period === 0) return s.factor * rng(s.range, p);
-    let sum = 0;
-    for (let k = p - s.period; k < p; k++) sum += rng(s.range, k);
-    return s.factor * (sum / s.period);
-  };
-  const white = (i) => c[i] >= o[i];
-  const upper = (i) => h[i] - Math.max(c[i], o[i]);
-  const lower = (i) => Math.min(c[i], o[i]) - l[i];
-  return { n, o, h, l, c, body, hl, avg, white, upper, lower };
-}
-
-function run(bars, lookback, test, name = "candlestick pattern") {
-  requireBars(bars, name);
-  const x = context(bars);
-  const out = new Array(x.n).fill(0);
-  for (let i = lookback; i < x.n; i++) out[i] = test(x, i) || 0;
-  return out;
-}
+const SETTINGS = SET;
+const run = (bars, lookback, test) => runCandle(bars, "candlestick pattern", lookback, test);
 
 const LOOKBACK = {
+  ...LOOKBACK_G1, ...LOOKBACK_G2, ...LOOKBACK_G3, ...LOOKBACK_G4,
   engulfing: 2, hammer: 11, invertedHammer: 11, hangingMan: 11, shootingStar: 11, piercing: 11, darkCloudCover: 11,
   morningStar: 12, morningDojiStar: 12, eveningStar: 12, eveningDojiStar: 12, harami: 11, threeWhiteSoldiers: 12,
   threeBlackCrows: 13, threeInside: 12, threeOutside: 3, abandonedBaby: 12, matHold: 14, ladderBottom: 14, marubozu: 10,
@@ -290,12 +260,32 @@ export function matHold(bars, penetration = 0.5) {
   });
 }
 
-/* name -> function. The twenty, in the order a reader meets them. */
+/* The 41 further TA-Lib patterns, ported in candles-g1..g4.js (the same averaging, bar-for-bar the same output), re-exported
+   here so one import reaches all sixty-one. Several are NOISY by nature (doji, spinningTop, highWave, longLeggedDoji,
+   rickshawMan, shortLine, longLine, beltHold, hikkake fire on a quarter of all bars or more): they are in the library because
+   they are TA-Lib's, and whether anything built on it SHOWS them is a curation choice (see the README). */
+export {
+  doji, dragonflyDoji, gravestoneDoji, longLeggedDoji, rickshawMan, highWave, spinningTop, shortLine, longLine, beltHold, closingMarubozu, takuri,
+  dojiStar, haramiCross, homingPigeon, inNeck, onNeck, thrusting, counterattack, matchingLow, separatingLines, kicking, kickingByLength,
+  twoCrows, upsideGapTwoCrows, threeStarsInSouth, identicalThreeCrows, stickSandwich, uniqueThreeRiver, triStar, tasukiGap, advanceBlock, stalledPattern, gapSideSideWhite,
+  threeLineStrike, breakaway, concealingBabySwallow, riseFallThreeMethods, xSideGapThreeMethods, hikkake, hikkakeMod,
+};
+
+/* name -> function: all sixty-one, the twenty curated ones first, in the order a reader meets them. */
 export const CANDLE_PATTERNS = {
   engulfing, hammer, invertedHammer, hangingMan, shootingStar, piercing, darkCloudCover, morningStar, morningDojiStar,
   eveningStar, eveningDojiStar, harami, threeWhiteSoldiers, threeBlackCrows, threeInside, threeOutside, abandonedBaby,
   matHold, ladderBottom, marubozu,
+  doji, dragonflyDoji, gravestoneDoji, longLeggedDoji, rickshawMan, highWave, spinningTop, shortLine, longLine, beltHold, closingMarubozu, takuri,
+  dojiStar, haramiCross, homingPigeon, inNeck, onNeck, thrusting, counterattack, matchingLow, separatingLines, kicking, kickingByLength,
+  twoCrows, upsideGapTwoCrows, threeStarsInSouth, identicalThreeCrows, stickSandwich, uniqueThreeRiver, triStar, tasukiGap, advanceBlock, stalledPattern, gapSideSideWhite,
+  threeLineStrike, breakaway, concealingBabySwallow, riseFallThreeMethods, xSideGapThreeMethods, hikkake, hikkakeMod,
 };
+
+/* The twenty the nightly scan uses (the reversal and continuation shapes that are not mere indecision). */
+export const CURATED_CANDLES = ["engulfing", "hammer", "invertedHammer", "hangingMan", "shootingStar", "piercing", "darkCloudCover", "morningStar",
+  "morningDojiStar", "eveningStar", "eveningDojiStar", "harami", "threeWhiteSoldiers", "threeBlackCrows", "threeInside", "threeOutside",
+  "abandonedBaby", "matHold", "ladderBottom", "marubozu"];
 
 /* Every pattern that fires on bar `i`, as [{ name, value }]. value is the signed integer above. */
 export function candlesAt(bars, i, patterns = CANDLE_PATTERNS) {

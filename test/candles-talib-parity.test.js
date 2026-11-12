@@ -5,11 +5,12 @@
    roughly the same shapes". These tests fail on any bar that differs.
 
    Two fixtures, both TA-Lib 0.7.1's own output on real daily bars (scripts/make-candle-fixture.py):
-     candles-talib.json       ten large Indian companies across sectors, 600 sessions each, all twenty patterns
-     candles-talib-rare.json  89 windows around the hits of the patterns that are rare on ten companies (Three White
-                              Soldiers, Three Black Crows, Abandoned Baby, Mat Hold, Ladder Bottom, the doji stars...)
-   On top of that, over 1,053 symbols x 5 years (1,047,363 bars, not committed) all twenty matched on every bar: see
-   docs/accuracy.md. */
+     candles-talib.json       ten large Indian companies across sectors, 600 sessions each, all sixty-one patterns
+     candles-talib-rare.json  274 windows around the hits of the patterns that are rare on ten companies (Three White
+                              Soldiers, Abandoned Baby, Kicking, Concealing Baby Swallow, Three Stars in the South...),
+                              with TA-Lib's output for all sixty-one on each
+   On top of that, over 1,053 symbols x 5 years (1,047,363 bars, not committed) all sixty-one matched on every bar: see
+   docs/accuracy.md and scripts/candle-parity.mjs. */
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -19,8 +20,10 @@ const load = (f) => JSON.parse(readFileSync(new URL(`./fixtures/${f}`, import.me
 const toBars = (rows) => rows.map(([o, h, l, c, v]) => ({ o, h, l, c, v }));
 const names = Object.keys(TA.CANDLE_PATTERNS);
 
-test("there are twenty patterns, each with a lookback", () => {
-  assert.equal(names.length, 20);
+test("there are sixty-one patterns, each with a lookback, and twenty of them are the curated set", () => {
+  assert.equal(names.length, 61);
+  assert.equal(TA.CURATED_CANDLES.length, 20);
+  assert.ok(TA.CURATED_CANDLES.every((n) => n in TA.CANDLE_PATTERNS));
   for (const n of names) assert.ok(TA.candleLookback(n) >= 2, n);
   assert.throws(() => TA.candleLookback("nope"));
 });
@@ -45,7 +48,7 @@ test("every pattern equals TA-Lib on ten real companies, bar for bar", () => {
     }
   }
   assert.deepEqual(wrong.slice(0, 10), [], `${wrong.length} bars differ from TA-Lib`);
-  assert.ok(hits > 1500, `the fixture should hold real hits to compare (${hits})`);
+  assert.ok(hits > 10000, `the fixture should hold real hits to compare (${hits})`);
   assert.ok(compared > 100000);
 });
 
@@ -63,7 +66,10 @@ test("the rare patterns equal TA-Lib on windows around their real hits", () => {
     }
   }
   assert.deepEqual(wrong.slice(0, 10), [], `${wrong.length} bars differ from TA-Lib`);
-  for (const n of ["threeWhiteSoldiers", "threeBlackCrows", "abandonedBaby", "matHold", "ladderBottom", "morningDojiStar", "eveningDojiStar", "piercing", "darkCloudCover"]) {
+  for (const n of ["threeWhiteSoldiers", "threeBlackCrows", "abandonedBaby", "matHold", "ladderBottom", "morningDojiStar", "eveningDojiStar", "piercing",
+    "darkCloudCover", "threeStarsInSouth", "concealingBabySwallow", "kicking", "kickingByLength", "breakaway", "identicalThreeCrows", "riseFallThreeMethods",
+    "stalledPattern", "upsideGapTwoCrows", "twoCrows", "inNeck", "onNeck", "counterattack", "hikkakeMod", "hikkake", "advanceBlock", "threeLineStrike",
+    "tasukiGap", "gapSideSideWhite", "stickSandwich"]) {
     assert.ok(seen[n] >= 5, `${n}: the windows must contain real hits (${seen[n] ?? 0})`);
   }
 });
@@ -94,7 +100,7 @@ test("values are the signed integers TA-Lib uses", () => {
   const F = load("candles-talib.json");
   const bars = toBars(F.symbols.HDFCBANK.bars);
   for (const n of names) {
-    for (const v of TA.CANDLE_PATTERNS[n](bars)) assert.ok([0, 100, -100, 80, -80].includes(v), `${n} produced ${v}`);
+    for (const v of TA.CANDLE_PATTERNS[n](bars)) assert.ok([0, 100, -100, 80, -80, 200, -200].includes(v), `${n} produced ${v}`);
   }
   /* Single-direction patterns keep their direction. */
   assert.ok(TA.hammer(bars).every((v) => v >= 0));

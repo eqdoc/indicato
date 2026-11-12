@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Regenerate test/fixtures/candles-talib.json: real daily bars of ten companies and TA-Lib's own output on them.
+"""Regenerate test/fixtures/candles-talib.json: real daily bars of ten companies and TA-Lib's own output on them, all 61 patterns.
 
     python3 scripts/make-candle-fixture.py <bars.csv.gz> test/fixtures/candles-talib.json
 
@@ -11,14 +11,7 @@ import csv, gzip, json, sys
 import numpy as np
 import talib
 
-PATTERNS = {
-    "engulfing": "CDLENGULFING", "hammer": "CDLHAMMER", "invertedHammer": "CDLINVERTEDHAMMER", "hangingMan": "CDLHANGINGMAN",
-    "shootingStar": "CDLSHOOTINGSTAR", "piercing": "CDLPIERCING", "darkCloudCover": "CDLDARKCLOUDCOVER",
-    "morningStar": "CDLMORNINGSTAR", "morningDojiStar": "CDLMORNINGDOJISTAR", "eveningStar": "CDLEVENINGSTAR",
-    "eveningDojiStar": "CDLEVENINGDOJISTAR", "harami": "CDLHARAMI", "threeWhiteSoldiers": "CDL3WHITESOLDIERS",
-    "threeBlackCrows": "CDL3BLACKCROWS", "threeInside": "CDL3INSIDE", "threeOutside": "CDL3OUTSIDE",
-    "abandonedBaby": "CDLABANDONEDBABY", "matHold": "CDLMATHOLD", "ladderBottom": "CDLLADDERBOTTOM", "marubozu": "CDLMARUBOZU",
-}
+PATTERNS = json.load(open(__file__.replace("make-candle-fixture.py", "candle-patterns.json")))   # all 61: indicato name -> TA-Lib function
 src, dst = sys.argv[1], sys.argv[2]
 by = {}
 with gzip.open(src, "rt") as f:

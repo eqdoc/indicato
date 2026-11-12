@@ -103,7 +103,7 @@ test("every exported function is covered by the causality check", () => {
   const helpers = new Set(["highest", "lowest", "trueRange", "rma", "stdev", "vol"]);
   /* The candle, event and chart-pattern functions do not return one number per bar, so they are held by their own
      causality tests: candles-talib-parity.test.js, events.test.js, patterns.test.js. */
-  for (const n of ["CANDLE_PATTERNS", "abandonedBaby", "candleLookback", "candlesAt", "darkCloudCover", "engulfing", "eveningDojiStar",
+  for (const n of ["CANDLE_PATTERNS", "CURATED_CANDLES", "advanceBlock", "beltHold", "breakaway", "closingMarubozu", "concealingBabySwallow", "counterattack", "doji", "dojiStar", "dragonflyDoji", "gapSideSideWhite", "gravestoneDoji", "haramiCross", "highWave", "hikkake", "hikkakeMod", "homingPigeon", "identicalThreeCrows", "inNeck", "kicking", "kickingByLength", "longLeggedDoji", "longLine", "matchingLow", "onNeck", "rickshawMan", "riseFallThreeMethods", "separatingLines", "shortLine", "spinningTop", "stalledPattern", "stickSandwich", "takuri", "tasukiGap", "threeLineStrike", "threeStarsInSouth", "thrusting", "triStar", "twoCrows", "uniqueThreeRiver", "upsideGapTwoCrows", "xSideGapThreeMethods", "abandonedBaby", "candleLookback", "candlesAt", "darkCloudCover", "engulfing", "eveningDojiStar",
     "eveningStar", "hammer", "hangingMan", "harami", "invertedHammer", "ladderBottom", "marubozu", "matHold", "morningDojiStar",
     "morningStar", "piercing", "shootingStar", "threeBlackCrows", "threeInside", "threeOutside", "threeWhiteSoldiers",
     "DIV_MAX", "DIV_MIN", "PIVOT_K", "WARMUP", "EVENT_SIGNALS", "eventConfirmations", "fractalPivots", "indicatorEvents", "volumeRatio",

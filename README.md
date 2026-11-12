@@ -167,28 +167,42 @@ mode         rolling mode
 
 ## Candlestick patterns
 
-Twenty patterns, defined the way TA-Lib defines them, integer for integer.
+All sixty-one of TA-Lib's, defined the way TA-Lib defines them, integer for integer.
 
 ```js
-import { engulfing, hammer, morningStar, CANDLE_PATTERNS } from "indicato";
+import { engulfing, hammer, morningStar, doji, CANDLE_PATTERNS, CURATED_CANDLES } from "indicato";
 
 engulfing(bars);            // [0, 0, 100, 0, -80, ...]   same length as bars
 hammer(bars);               // [0, 0, 0, 100, ...]
 morningStar(bars, 0.3);     // the star patterns take TA-Lib's penetration
-Object.keys(CANDLE_PATTERNS);
+Object.keys(CANDLE_PATTERNS);   // all sixty-one
+CURATED_CANDLES;            // the twenty named reversal / continuation shapes
 ```
 
-```
-engulfing        hammer            invertedHammer    hangingMan       shootingStar
-piercing         darkCloudCover    morningStar       morningDojiStar  eveningStar
-eveningDojiStar  harami            threeWhiteSoldiers threeBlackCrows threeInside
-threeOutside     abandonedBaby     matHold           ladderBottom     marubozu
-```
-
-A value is +100 or -100 for a bullish or bearish shape, +-80 for the weaker "equal edge" variants TA-Lib marks on
-Engulfing and Harami, 0 where there is none. "Long body" and "very short shadow" are measured against the candles
-before, exactly as TA-Lib measures them, which is why these agree with it on every bar of a million (see
+A value is +100 or -100 for a bullish or bearish shape, +-80 for the weaker "equal edge" variants TA-Lib marks on Engulfing
+and Harami, +-200 for a confirmed Hikkake, 0 where there is none. "Long body" and "very short shadow" are measured against the
+candles before, exactly as TA-Lib measures them, which is why these agree with it on every bar of a million (see
 [accuracy notes](./docs/accuracy.md)). The first `candleLookback(name)` bars are 0.
+
+```
+engulfing  hammer  invertedHammer  hangingMan  shootingStar  piercing  darkCloudCover  morningStar  morningDojiStar
+eveningStar  eveningDojiStar  harami  threeWhiteSoldiers  threeBlackCrows  threeInside  threeOutside  abandonedBaby
+matHold  ladderBottom  marubozu                                                         the twenty in CURATED_CANDLES
+
+twoCrows  threeLineStrike  threeStarsInSouth  advanceBlock  beltHold  breakaway  closingMarubozu  concealingBabySwallow
+counterattack  doji  dojiStar  dragonflyDoji  gapSideSideWhite  gravestoneDoji  haramiCross  highWave  hikkake  hikkakeMod
+homingPigeon  identicalThreeCrows  inNeck  kicking  kickingByLength  longLeggedDoji  longLine  matchingLow  onNeck
+rickshawMan  riseFallThreeMethods  separatingLines  shortLine  spinningTop  stalledPattern  stickSandwich  takuri
+tasukiGap  thrusting  triStar  uniqueThreeRiver  upsideGapTwoCrows  xSideGapThreeMethods
+```
+
+**Some of them fire on a large share of all candles, and that is TA-Lib's definition, not a bug.** Over a million daily bars
+(1,053 Indian symbols x 5 years): `spinningTop` 23%, `longLine` 19%, `beltHold` 18%, `shortLine` 16%, `doji` 15%,
+`longLeggedDoji` 15%, `hikkake` 14%, `highWave` 14%, `rickshawMan` 11%, `closingMarubozu` 6%. They describe candle
+SHAPES (indecision, a long or short body), not events. They are in the library because they are TA-Lib's and because a
+reader comparing with TA-Lib should find every pattern; a screen, an alert or a list that surfaces candle patterns to
+people should choose which to show (eqdoc's nightly scan uses the twenty in `CURATED_CANDLES` and leaves the indecision
+shapes out). Nothing here says what a pattern means for the price.
 
 ## Indicator events
 

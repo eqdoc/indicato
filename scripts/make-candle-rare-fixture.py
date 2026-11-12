@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Regenerate test/fixtures/candles-talib-rare.json: 45-bar windows around the hits of the patterns that are rare on a
-ten-company sample (Three White Soldiers, Three Black Crows, Abandoned Baby, Mat Hold, Ladder Bottom, the doji stars,
-Piercing, Dark Cloud), with TA-Lib's output on each window.
+ten-company sample, with TA-Lib's output for all 61 patterns on each window.
 
     python3 scripts/make-candle-rare-fixture.py <universe.json> test/fixtures/candles-talib-rare.json
 
@@ -12,12 +11,13 @@ import json, sys
 import numpy as np
 import talib
 
-RARE = {"threeWhiteSoldiers": "CDL3WHITESOLDIERS", "threeBlackCrows": "CDL3BLACKCROWS", "abandonedBaby": "CDLABANDONEDBABY",
-        "matHold": "CDLMATHOLD", "ladderBottom": "CDLLADDERBOTTOM", "morningDojiStar": "CDLMORNINGDOJISTAR",
-        "eveningDojiStar": "CDLEVENINGDOJISTAR", "piercing": "CDLPIERCING", "darkCloudCover": "CDLDARKCLOUDCOVER"}
-ALL = {"engulfing": "CDLENGULFING", "hammer": "CDLHAMMER", "invertedHammer": "CDLINVERTEDHAMMER", "hangingMan": "CDLHANGINGMAN",
-       "shootingStar": "CDLSHOOTINGSTAR", "morningStar": "CDLMORNINGSTAR", "eveningStar": "CDLEVENINGSTAR", "harami": "CDLHARAMI",
-       "threeInside": "CDL3INSIDE", "threeOutside": "CDL3OUTSIDE", "marubozu": "CDLMARUBOZU", **RARE}
+ALL = json.load(open(__file__.replace("make-candle-rare-fixture.py", "candle-patterns.json")))   # all 61: indicato name -> TA-Lib function
+# the patterns that are rare on a ten-company sample: fewer than ~1,000 hits over 1,053 symbols x 5 years, plus the stateful hikkakes
+RARE_NAMES = ["threeWhiteSoldiers", "threeBlackCrows", "abandonedBaby", "matHold", "ladderBottom", "morningDojiStar", "eveningDojiStar",
+              "piercing", "darkCloudCover", "threeStarsInSouth", "concealingBabySwallow", "kicking", "kickingByLength", "breakaway",
+              "identicalThreeCrows", "riseFallThreeMethods", "stalledPattern", "upsideGapTwoCrows", "twoCrows", "inNeck", "onNeck",
+              "counterattack", "hikkakeMod", "hikkake", "advanceBlock", "threeLineStrike", "tasukiGap", "gapSideSideWhite", "stickSandwich"]
+RARE = {k: ALL[k] for k in RARE_NAMES}
 PER, BEFORE, AFTER = 10, 40, 4
 U = json.load(open(sys.argv[1]))
 out = {"talib": talib.__version__, "windows": []}
@@ -29,7 +29,8 @@ for sym in sorted(U):
         if count[name] >= PER:
             continue
         a = getattr(talib, fn)(o, h, l, c)
-        for i in np.nonzero(a)[0][::7]:
+        hits = np.nonzero(a)[0]
+        for i in (hits if len(hits) < 40 else hits[::max(1, len(hits) // 40)]):
             if i < BEFORE or i + AFTER >= len(c) or count[name] >= PER:
                 continue
             seg = b[i - BEFORE:i + AFTER + 1]
