@@ -1,6 +1,6 @@
 /* indicato — technical indicators for JavaScript.
  *
- * Pure functions over price bars. No imports, no network, no state. Every function
+ * Pure functions over price bars. No dependencies, no network, no state. Every function
  * returns an array the same length as its input, null until it has enough history.
  *
  * The formulas are their authors' — Wilder, Hull, Kaufman, Legoux, Tillson, Ehlers,
@@ -53,6 +53,9 @@
  *
  * Added after eqdoc/indicato#2, where the silent version cost a real afternoon. */
 
+import { toNull, wantsTalib } from "./talib.js";
+import * as TA from "./talib.js";
+
 const isNumberSeries = (x) => Array.isArray(x) && x.length > 0 && typeof x[0] === "number";
 
 /* Only the close is read, so numbers are bars with nothing else filled in. */
@@ -83,7 +86,13 @@ function rma(values, n) {
   return out;
 }
 
-export function sma(values, n) {
+/* Simple moving average. Both modes keep a running total; they differ in the order of the two roundings. Default: the new value is
+   added and the oldest taken off before the division. { compat: "talib" } is TA-Lib's order: divide first, and only then let the
+   oldest leave the total. The results agree to about 1e-13 and drift apart to a few 1e-12 over thousands of bars; what the order
+   decides is a tie a hair either side of a price (a close exactly on its own average), which is why a scan held to TA-Lib's rows
+   asks for it. */
+export function sma(values, n, opts) {
+  if (wantsTalib(opts, "sma")) return toNull(TA.sma(values, n));
   const out = new Array(values.length).fill(null);
   let sum = 0;
   for (let i = 0; i < values.length; i++) {
@@ -189,8 +198,17 @@ function trueRange(bars) {
 /* Exported since Keltner needs it and a reader may want it on its own: the size
    of a typical session, in rupees. TRUE range, not high minus low — a share that
    gapped 100 to 130 overnight then traded 130-132 had a 2-rupee day by high minus
-   low and a 32-rupee day in truth. */
-export const atr = (bars, n = 14) => rma(trueRange(requireBars(bars, "atr")), n);
+   low and a 32-rupee day in truth.
+
+   Wilder's smoothing, seeded with the mean of the true ranges of bars 0..n-1, so the
+   first value is at bar n-1. { compat: "talib" } is TA-Lib's: bar 0 has no previous
+   close, so its range is left out, the mean is of bars 1..n and the first value is at
+   bar n. The seed's weight decays by (n-1)/n a bar, so the two converge, slowly. */
+export const atr = (bars, n = 14, opts) => {
+  bars = requireBars(bars, "atr");
+  if (wantsTalib(opts, "atr")) return toNull(TA.atr(bars.map((b) => b.h), bars.map((b) => b.l), bars.map((b) => b.c), n));
+  return rma(trueRange(bars), n);
+};
 
 
 /* ── the moving-average family ────────────────────────────────────────────────
@@ -1092,8 +1110,18 @@ export function mode(src, n = 20, dp = 1) {
 
 /* ---- the families ---- */
 
-export function macd(bars, fast = 12, slow = 26, signal = 9) {
+/* MACD: the fast EMA less the slow one, its EMA as the signal, and the gap as the histogram.
+   Default: each EMA is seeded at its own bar n-1, so the line starts at bar slow-1 and the
+   signal after a further signal-1 bars. { compat: "talib" } seeds the fast EMA at bar
+   slow-1 (from the mean of the fast-period closes ending there) and the signal with the mean of the
+   first signal MACD values: the three series start together at bar slow+signal-2 (33), and
+   a 40-bar listing is read the way TA-Lib reads it. */
+export function macd(bars, fast = 12, slow = 26, signal = 9, opts) {
   bars = closeBars(bars);
+  if (wantsTalib(opts, "macd")) {
+    const m = TA.macd(bars.map((b) => b.c), fast, slow, signal);
+    return { line: toNull(m.line), signal: toNull(m.signal), hist: toNull(m.hist) };
+  }
   const close = bars.map((b) => b.c);
   const f = ema(close, fast);
   const s = ema(close, slow);
@@ -1142,8 +1170,11 @@ export function obv(bars) {
    here is affected, because none of them trades inside the warmup. It is written down
    because a library that is silently a hair different from the reference for its first
    fifty bars is a library somebody will file an issue about, and they would be right. */
-export function rsi(bars, n = 14) {
+export function rsi(bars, n = 14, opts) {
   bars = closeBars(bars);
+  /* { compat: "talib" } is TA-Lib's: the first n changes are averaged and the first value is at bar n, then Wilder's
+     smoothing, written in TA-Lib's order. Equal to TA-Lib's to 1e-12, warm-up included. */
+  if (wantsTalib(opts, "rsi")) return toNull(TA.rsi(bars.map((b) => b.c), n));
   const gains = [], losses = [];
   for (let i = 0; i < bars.length; i++) {
     const d = i === 0 ? 0 : bars[i].c - bars[i - 1].c;
@@ -1166,8 +1197,14 @@ export function rsi(bars, n = 14) {
    3-period average; computed that way the two are identical to 0.000000. Both are
    right and they are different outputs, so the difference is named here rather than
    found by someone comparing one against the other. */
-export function stochRsi(bars, n = 14, k = 3, d = 3) {
+export function stochRsi(bars, n = 14, k = 3, d = 3, opts) {
   bars = closeBars(bars);
+  /* { compat: "talib" } is TA-Lib's STOCHRSI(n, k, d, SMA): `k` is then TA-Lib's fastk_period (its default is 5, not 3), the
+     returned `k` is the RAW fastk over the last k RSI values, and `d` is its d-period mean. Both start at bar n+k+d-2. */
+  if (wantsTalib(opts, "stochRsi")) {
+    const s = TA.stochRsi(bars.map((b) => b.c), n, k, d);
+    return { k: toNull(s.k), d: toNull(s.d) };
+  }
   const r = rsi(bars, n);
   const raw = r.map((v, i) => {
     if (v === null || i < n * 2 - 2) return null;
@@ -1226,9 +1263,18 @@ export function donchian(bars, n = 20, prior = false) {
   return { upper, lower };
 }
 
-export function bollinger(bars, n = 20, mult = 2) {
+/* Bollinger bands: a moving average and mult standard deviations either side. Default: the deviation is the root of the mean of the
+   squared deviations from the mean. { compat: "talib" } is TA-Lib's BBANDS: the running-total mean, and the root of (mean of the
+   squares less the square of the mean), taken as 0 when that is under 1e-8. The two are the same number in exact arithmetic and
+   differ by about 1e-10 on a share; on a series that barely moves (a liquid fund at 1,100) the subtraction cancels and TA-Lib's
+   bands are visibly different. */
+export function bollinger(bars, n = 20, mult = 2, opts) {
   bars = closeBars(bars);
   const close = bars.map((b) => b.c);
+  if (wantsTalib(opts, "bollinger")) {
+    const b = TA.bbands(close, n, mult);
+    return { mid: toNull(b.mid), upper: toNull(b.upper), lower: toNull(b.lower) };
+  }
   const mid = sma(close, n);
   const dev = close.map((_, i) => {
     if (mid[i] === null) return null;
@@ -1261,8 +1307,15 @@ export function yearBand(bars, n = 252) {
   };
 }
 
-export function dmi(bars, n = 14) {
+/* Directional movement: +DI, -DI and ADX. Default: Wilder's averages seeded at bar n-1. { compat: "talib" } is TA-Lib's PLUS_DI,
+   MINUS_DI and ADX: the first n-1 movements are summed, each later one enters as sum - sum/n + x, +DI and -DI start at bar n
+   and ADX (the mean of the first n DX values, then smoothed) at bar 2n-1. Same shape, differences of 1e-8 that decay slowly. */
+export function dmi(bars, n = 14, opts) {
   bars = requireBars(bars, "dmi");
+  if (wantsTalib(opts, "dmi")) {
+    const d = TA.directional(bars.map((b) => b.h), bars.map((b) => b.l), bars.map((b) => b.c), n);
+    return { pdi: toNull(d.pdi), mdi: toNull(d.mdi), adx: toNull(d.adx) };
+  }
   const plus = [], minus = [];
   for (let i = 0; i < bars.length; i++) {
     if (i === 0) { plus.push(0); minus.push(0); continue; }
@@ -1292,8 +1345,12 @@ export function dmi(bars, n = 14) {
 /* Wilder's Parabolic SAR, acceleration 0.02 stepping to 0.20. Written out in
    full rather than approximated: the whole content of the indicator is where it
    flips, and a flip one bar early is the only thing a reader would check. */
-export function psar(bars, step = 0.02, max = 0.2) {
+export function psar(bars, step = 0.02, max = 0.2, opts) {
   bars = requireBars(bars, "psar");
+  /* { compat: "talib" } is TA-Lib's SAR: the first bar's minus-DM decides the starting direction (down when the second bar's low
+     fell by more than its high rose, otherwise up), where the default reads the second bar's close against the first's. The
+     series starts at bar 1 in both; they differ on a reversal bar when the two start rules put a leg one bar apart. */
+  if (wantsTalib(opts, "psar")) return toNull(TA.sar(bars.map((b) => b.h), bars.map((b) => b.l), step, max));
   const out = new Array(bars.length).fill(null);
   if (bars.length < 3) return out;
   let up = bars[1].c >= bars[0].c;
@@ -1317,9 +1374,13 @@ export function psar(bars, step = 0.02, max = 0.2) {
   return out;
 }
 
-export function supertrend(bars, n = 10, mult = 3) {
+export function supertrend(bars, n = 10, mult = 3, opts) {
   bars = requireBars(bars, "supertrend");
-  const a = atr(bars, n);
+  /* TA-Lib has no Supertrend. { compat: "talib" } is the one Python scans write: TA-Lib's ATR under it (so the first value is at
+     bar n, not n-1) and the first leg is a downtrend, the line the upper band, where the default opens in the direction of the
+     close against the bar's midpoint. Every later bar follows the same rules, so the two differ only until their first flip. */
+  const talib = wantsTalib(opts, "supertrend");
+  const a = atr(bars, n, talib ? { compat: "talib" } : undefined);
   const line = new Array(bars.length).fill(null);
   const dir = new Array(bars.length).fill(null);
   let upper = null, lower = null, trendUp = true;
@@ -1330,7 +1391,7 @@ export function supertrend(bars, n = 10, mult = 3) {
     const bl = mid - mult * a[i];
     upper = upper === null || bu < upper || bars[i - 1].c > upper ? bu : upper;
     lower = lower === null || bl > lower || bars[i - 1].c < lower ? bl : lower;
-    if (line[i - 1] === null) trendUp = bars[i].c >= mid;
+    if (line[i - 1] === null) trendUp = talib ? false : bars[i].c >= mid;
     else if (trendUp && bars[i].c < lower) trendUp = false;
     else if (!trendUp && bars[i].c > upper) trendUp = true;
     line[i] = trendUp ? lower : upper;
